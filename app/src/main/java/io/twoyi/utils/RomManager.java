@@ -13,7 +13,6 @@ import android.content.pm.ApplicationInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Process;
 import android.provider.OpenableColumns;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -384,7 +383,7 @@ public final class RomManager {
 
     public static void shutdown(Context context) {
         System.exit(0);
-        Process.killProcess(Process.myPid());
+        android.os.Process.killProcess(android.os.Process.myPid());
     }
 
     public static File getRootfsDir(Context context) {
