@@ -67,12 +67,12 @@ jobs:
             touch app/src/main/assets/rootfs.7z
           fi
           if [ ! -f app/src/main/assets/rom.ini ]; then
-            cat > app/src/main/assets/rom.ini <<'EOF'
-author=github-actions
-version=ci-placeholder
-code=0
-desc=placeholder asset for CI build
-EOF
+            {
+              echo "author=github-actions"
+              echo "version=ci-placeholder"
+              echo "code=0"
+              echo "desc=placeholder asset for CI build"
+            } > app/src/main/assets/rom.ini
           fi
 
       - name: Build with Gradle
