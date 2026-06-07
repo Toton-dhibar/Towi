@@ -7,7 +7,7 @@
 #
 # NOTE: Placeholder assets are included to allow CI builds.
 # For a functional APK, replace app/src/main/assets/rootfs.7z with:
-# https://github.com/cyanmint/twoyi/releases/download/original/rootfs.7z
+# https://github.com/Toton-dhibar/Towi/releases/download/original/rootfs.7z
 ---
 name: Build APK
 
@@ -59,6 +59,21 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Prepare CI rootfs assets
+        run: |
+          mkdir -p app/src/main/assets
+          if [ ! -f app/src/main/assets/rootfs.7z ]; then
+            touch app/src/main/assets/rootfs.7z
+          fi
+          if [ ! -f app/src/main/assets/rom.ini ]; then
+            cat > app/src/main/assets/rom.ini <<'EOF'
+            author=github-actions
+            version=ci-placeholder
+            code=0
+            desc=placeholder asset for CI build
+            EOF
+          fi
 
       - name: Build with Gradle
         run: ./gradlew assembleRelease

@@ -89,6 +89,7 @@ PS. Please use ndk v22 or lower, otherwise it may fail.
 
 Currently you cannot build the ROM yourself, instead you can use the prebuilt ROM.
 To do that, extract rootfs.7z from the official release apk and copy it to `app/src/main/assets`.
+For creating Android 10-compatible rootfs archives from open-source GSIs, see [ANDROID10_ROOTFS_GUIDE.md](ANDROID10_ROOTFS_GUIDE.md).
 
 ### Build the app with Android Studio
 

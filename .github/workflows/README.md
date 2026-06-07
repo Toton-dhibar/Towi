@@ -14,7 +14,7 @@ This repository includes a GitHub Actions workflow that automatically builds the
 Before the workflow can successfully build the APK, you need to:
 
 1. **Add the rootfs.7z file** to `app/src/main/assets/`
-   - Download from: https://github.com/cyanmint/twoyi/releases/download/original/rootfs.7z
+   - Download from: https://github.com/Toton-dhibar/Towi/releases/download/original/rootfs.7z
    - Or extract it from an official release APK
    - Place it in `app/src/main/assets/rootfs.7z`
 
