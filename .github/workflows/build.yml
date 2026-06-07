@@ -68,11 +68,11 @@ jobs:
           fi
           if [ ! -f app/src/main/assets/rom.ini ]; then
             cat > app/src/main/assets/rom.ini <<'EOF'
-            author=github-actions
-            version=ci-placeholder
-            code=0
-            desc=placeholder asset for CI build
-            EOF
+author=github-actions
+version=ci-placeholder
+code=0
+desc=placeholder asset for CI build
+EOF
           fi
 
       - name: Build with Gradle
