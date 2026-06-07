@@ -20,7 +20,6 @@ package io.twoyi;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.ContentResolver;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -45,9 +44,6 @@ import androidx.annotation.NonNull;
 import com.cleveroad.androidmanimation.LoadingAnimationView;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -449,48 +445,8 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
         UIHelper.defer().when(() -> {
             String activeProfile = ProfileManager.getActiveProfile(this);
             File profileRootfsDir = ProfileManager.getProfileRootfsDir(this, activeProfile);
-            
-            // Clear existing rootfs
-            if (profileRootfsDir.exists()) {
-                io.twoyi.utils.IOUtils.deleteDirectory(profileRootfsDir);
-            }
-            profileRootfsDir.mkdirs();
-            
-            File tempFile = new File(getCacheDir(), "rootfs_import.tar");
-
-            ContentResolver contentResolver = getContentResolver();
-            try (InputStream inputStream = contentResolver.openInputStream(uri);
-                 OutputStream os = new FileOutputStream(tempFile)) {
-                byte[] buffer = new byte[8192];
-                int count;
-                while ((count = inputStream.read(buffer)) > 0) {
-                    os.write(buffer, 0, count);
-                }
-            }
-
-            String tempFilePath = tempFile.getAbsolutePath();
-            String rootfsPath = profileRootfsDir.getAbsolutePath();
-            
-            if (tempFilePath.contains(";") || tempFilePath.contains("&") ||
-                rootfsPath.contains(";") || rootfsPath.contains("&")) {
-                throw new SecurityException("Invalid path detected");
-            }
-            
-            // Extract tar to rootfs directory
-            ProcessBuilder pb = new ProcessBuilder(
-                "tar", "-xf", tempFilePath,
-                "-C", rootfsPath
-            );
-            Process process = pb.start();
-            int exitCode = process.waitFor();
-            
-            tempFile.delete();
-            
-            if (exitCode == 0) {
-                RomManager.initRootfs(this);
-            }
-            
-            return exitCode == 0;
+            RomManager.importRootfsArchive(this, uri, profileRootfsDir);
+            return true;
         }).done(result -> {
             UIHelper.dismiss(dialog);
             if (result) {

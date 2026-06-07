@@ -8,7 +8,6 @@ package io.twoyi.ui;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -31,10 +30,7 @@ import androidx.core.content.FileProvider;
 import com.microsoft.appcenter.crashes.Crashes;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.List;
 
@@ -344,48 +340,8 @@ public class SettingsActivity extends AppCompatActivity {
             UIHelper.defer().when(() -> {
                 String activeProfile = ProfileManager.getActiveProfile(activity);
                 File profileRootfsDir = ProfileManager.getProfileRootfsDir(activity, activeProfile);
-                
-                // Clear existing rootfs
-                if (profileRootfsDir.exists()) {
-                    io.twoyi.utils.IOUtils.deleteDirectory(profileRootfsDir);
-                }
-                profileRootfsDir.mkdirs();
-                
-                File tempFile = new File(activity.getCacheDir(), "rootfs_import.tar");
-
-                ContentResolver contentResolver = activity.getContentResolver();
-                try (InputStream inputStream = contentResolver.openInputStream(uri);
-                     OutputStream os = new FileOutputStream(tempFile)) {
-                    byte[] buffer = new byte[8192];
-                    int count;
-                    while ((count = inputStream.read(buffer)) > 0) {
-                        os.write(buffer, 0, count);
-                    }
-                }
-
-                String tempFilePath = tempFile.getAbsolutePath();
-                String rootfsPath = profileRootfsDir.getAbsolutePath();
-                
-                if (tempFilePath.contains(";") || tempFilePath.contains("&") ||
-                    rootfsPath.contains(";") || rootfsPath.contains("&")) {
-                    throw new SecurityException("Invalid path detected");
-                }
-                
-                // Extract tar to rootfs directory
-                ProcessBuilder pb = new ProcessBuilder(
-                    "tar", "-xf", tempFilePath,
-                    "-C", rootfsPath
-                );
-                Process process = pb.start();
-                int exitCode = process.waitFor();
-                
-                tempFile.delete();
-                
-                if (exitCode == 0) {
-                    RomManager.initRootfs(activity);
-                }
-                
-                return exitCode == 0;
+                RomManager.importRootfsArchive(activity, uri, profileRootfsDir);
+                return true;
             }).done(result -> {
                 UIHelper.dismiss(dialog);
                 if (result) {

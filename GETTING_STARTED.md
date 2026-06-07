@@ -80,7 +80,7 @@ You can import a rootfs from:
 4. Reboot when prompted
 
 **Supported Sources:**
-- Official ROM: https://github.com/cyanmint/twoyi/releases/download/original/rootfs.7z
+- Official ROM: https://github.com/Toton-dhibar/Towi/releases/download/original/rootfs.7z
 - Your own exports
 - Third-party ROMs (author name checking removed)
 
@@ -184,6 +184,8 @@ The container process runs independently:
 - Or switch back to a working profile
 
 ## Advanced Usage
+
+For building Android 10 rootfs archives from open-source GSI images, see [ANDROID10_ROOTFS_GUIDE.md](ANDROID10_ROOTFS_GUIDE.md).
 
 ### Manual Profile Management
 

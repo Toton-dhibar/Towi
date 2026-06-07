@@ -6,11 +6,15 @@
 
 package io.twoyi.utils;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Process;
+import android.provider.OpenableColumns;
 import android.util.DisplayMetrics;
 import android.util.Log;
 
@@ -35,6 +39,7 @@ import java.util.Enumeration;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.Adler32;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
@@ -209,6 +214,163 @@ public final class RomManager {
         // Just ensure system/vendor partitions are cleaned up
         removeSystemPartition(context);
         removeVendorPartition(context);
+    }
+
+    public static void importRootfsArchive(Context context, Uri uri, File targetRootfsDir) throws IOException, InterruptedException {
+        if (uri == null) {
+            throw new IOException("Missing ROM file");
+        }
+
+        if (targetRootfsDir.exists()) {
+            IOUtils.deleteDirectory(targetRootfsDir);
+        }
+        if (!targetRootfsDir.mkdirs() && !targetRootfsDir.exists()) {
+            throw new IOException("Failed to prepare rootfs directory");
+        }
+
+        String displayName = getArchiveDisplayName(context, uri);
+        String lowerName = displayName.toLowerCase(Locale.US);
+        String cacheName = "rootfs_import_" + System.currentTimeMillis() + getArchiveSuffix(lowerName);
+        File tempFile = new File(context.getCacheDir(), cacheName);
+
+        ContentResolver contentResolver = context.getContentResolver();
+        try (InputStream inputStream = contentResolver.openInputStream(uri)) {
+            if (inputStream == null) {
+                throw new IOException("Cannot open ROM file");
+            }
+            try (FileOutputStream os = new FileOutputStream(tempFile)) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = inputStream.read(buffer)) > 0) {
+                    os.write(buffer, 0, count);
+                }
+            }
+        }
+
+        try {
+            int exitCode = extractArchive(tempFile, targetRootfsDir, lowerName);
+            if (exitCode != 0) {
+                throw new IOException("ROM extraction failed with exit code: " + exitCode);
+            }
+            initRootfs(context);
+        } finally {
+            tempFile.delete();
+        }
+    }
+
+    private static String getArchiveDisplayName(Context context, Uri uri) {
+        String displayName = null;
+        Cursor cursor = null;
+        try {
+            cursor = context.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0) {
+                    displayName = cursor.getString(index);
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        if (displayName == null || displayName.trim().isEmpty()) {
+            String path = uri.getPath();
+            if (path != null && !path.trim().isEmpty()) {
+                int slash = path.lastIndexOf('/');
+                displayName = slash >= 0 ? path.substring(slash + 1) : path;
+            }
+        }
+        if (displayName == null || displayName.trim().isEmpty()) {
+            displayName = "rootfs.tar";
+        }
+        return displayName;
+    }
+
+    private static String getArchiveSuffix(String lowerName) {
+        if (lowerName.endsWith(".tar.gz")) {
+            return ".tar.gz";
+        }
+        if (lowerName.endsWith(".tgz")) {
+            return ".tgz";
+        }
+        if (lowerName.endsWith(".tar.xz")) {
+            return ".tar.xz";
+        }
+        if (lowerName.endsWith(".7z")) {
+            return ".7z";
+        }
+        if (lowerName.endsWith(".tar")) {
+            return ".tar";
+        }
+        return ".tar";
+    }
+
+    private static int extractArchive(File archive, File outputDir, String lowerName) throws IOException, InterruptedException {
+        String archivePath = archive.getAbsolutePath();
+        String outputPath = outputDir.getAbsolutePath();
+
+        if (archivePath.contains(";") || archivePath.contains("&") ||
+                outputPath.contains(";") || outputPath.contains("&")) {
+            throw new SecurityException("Invalid path detected");
+        }
+
+        if (lowerName.endsWith(".7z")) {
+            return extract7zArchive(archivePath, outputPath);
+        }
+        if (lowerName.endsWith(".tar.gz") || lowerName.endsWith(".tgz")) {
+            return runExtractCommand(new String[]{"tar", "-xzf", archivePath, "-C", outputPath});
+        }
+        if (lowerName.endsWith(".tar.xz")) {
+            return runExtractCommand(new String[]{"tar", "-xJf", archivePath, "-C", outputPath});
+        }
+        return runExtractCommand(new String[]{"tar", "-xf", archivePath, "-C", outputPath});
+    }
+
+    private static int extract7zArchive(String archivePath, String outputPath) throws IOException, InterruptedException {
+        String[][] commands = new String[][]{
+                {"7z", "x", "-y", archivePath, "-o" + outputPath},
+                {"7zz", "x", "-y", archivePath, "-o" + outputPath},
+                {"7zr", "x", "-y", archivePath, "-o" + outputPath},
+                {"tar", "-xf", archivePath, "-C", outputPath}
+        };
+
+        IOException lastStartError = null;
+        for (String[] command : commands) {
+            try {
+                int code = runExtractCommand(command);
+                if (code == 0) {
+                    return 0;
+                }
+            } catch (IOException startError) {
+                lastStartError = startError;
+            }
+        }
+        if (lastStartError != null) {
+            throw lastStartError;
+        }
+        return -1;
+    }
+
+    private static int runExtractCommand(String[] command) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        try (InputStream stream = process.getInputStream()) {
+            byte[] buffer = new byte[2048];
+            while (stream.read(buffer) != -1) {
+                // Drain output to avoid process blocking on pipe buffer.
+            }
+        }
+
+        boolean finished = process.waitFor(20, TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new IOException("ROM extraction timed out");
+        }
+        return process.exitValue();
     }
 
 
