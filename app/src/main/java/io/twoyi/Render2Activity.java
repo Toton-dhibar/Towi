@@ -264,10 +264,12 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
                     .setMessage(R.string.no_rootfs_select_rom)
                     .setPositiveButton(R.string.select_rom_file, (dialog, which) -> {
                         // Prompt user to select ROM file
-                        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
                         intent.setType("*/*");
                         intent.addCategory(Intent.CATEGORY_OPENABLE);
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                         try {
                             startActivityForResult(intent, REQUEST_SELECT_ROM);
                         } catch (Throwable ignored) {
@@ -428,7 +430,13 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
         
         if (requestCode == REQUEST_SELECT_ROM && resultCode == RESULT_OK) {
             if (data != null && data.getData() != null) {
-                importRomAndStart(data.getData());
+                Uri romUri = data.getData();
+                try {
+                    getContentResolver().takePersistableUriPermission(romUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (SecurityException ignored) {
+                    // Some providers don't support persistable permissions.
+                }
+                importRomAndStart(romUri);
             }
         }
     }
