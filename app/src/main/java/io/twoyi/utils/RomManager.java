@@ -128,14 +128,24 @@ public final class RomManager {
         try {
             Files.deleteIfExists(loaderSymlink);
             Files.createSymbolicLink(loaderSymlink, Paths.get(loaderPath));
-        } catch (IOException e) {
-            throw new RuntimeException("symlink loader failed.", e);
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            Log.w(TAG, "Unable to create loader symlink, falling back to file copy", e);
+            try {
+                Files.copy(Paths.get(loaderPath), loaderSymlink, StandardCopyOption.REPLACE_EXISTING);
+                File loaderFile = loaderSymlink.toFile();
+                // Keep broad execute/read permissions expected by the native launcher.
+                loaderFile.setReadable(true, false);
+                loaderFile.setExecutable(true, false);
+            } catch (IOException copyError) {
+                throw new RuntimeException("prepare loader binary failed.", copyError);
+            }
         }
     }
 
     private static void killOrphanProcess() {
         Shell shell = ShellUtil.newSh();
-        shell.newJob().add("ps -ef | awk '{if($3==1) print $2}' | xargs kill -9").exec();
+        // Only kill stale twoyi loader processes; never blanket-kill all PPID=1 processes.
+        shell.newJob().add("pkill -9 -f '/loader64' >/dev/null 2>&1 || true").exec();
     }
 
     private static void saveLastKmsg(Context context) {
